@@ -1,0 +1,34 @@
+new game
+
+time moves taken
+
+COLORS {
+    correct -> rgb(229	128	65	)
+    incorrect -> rgb(94	191	176	)
+    number_text -> rgb(255	255	255	)
+    secondary_text rgb(161	149	181	)
+    secondary button rgb(65	45	99	)
+    background rgb(78	54	111	)
+    button_hover rgb(206 49 94)
+}
+
+strings {
+    [
+    Move tiles in grid
+    to order them from <1 to 15.>,
+    TIME,
+    MOVES,
+    new game,
+    15 Puzzle,
+    Made with ❤ by Shubham Singh,
+    This project is open source, visit the repo.,
+    g_logo, li_logo, tw_logo
+    ]
+
+}
+
+finds {
+    @500 pxls viewport is cahnged
+    100x100 px boxes
+    60px high secondary labells
+}
