@@ -1,11 +1,19 @@
 import React, {useEffect, useState} from "react";
-import {v4 as uuidv4} from "uuid";
+import {range} from "lodash";
+import useTimer from "../hooks/useTimer";
+import {produce} from "immer";
 
 enum directions {
     UP,
     DOWN,
     LEFT,
     RIGHT,
+}
+
+type piece = {
+    value: number | null,
+    isCorrect: boolean,
+    isEmpty: boolean,
 }
 
 const directionsXY = new Map<directions, { rowShift: number, columnShift: number }>([
@@ -15,18 +23,10 @@ const directionsXY = new Map<directions, { rowShift: number, columnShift: number
     [directions.RIGHT, { rowShift: 0, columnShift: -1 }],
 ]);
 
-
-const pieceV: piece = {
-    value: 1,
-    isCorrect: false,
-    isEmpty: false
-}
-
 function move(direction: directions, board: piece[][], pieceXY: { row: number, column: number })
     : { board: piece[][], pieceXY: { row: number, column: number } } {
     const translation = directionsXY.get(direction);
-
-    if (translation?.rowShift === undefined || translation?.columnShift === undefined) {
+    if (translation === undefined) {
         console.log('translation not set');
         return { board, pieceXY };
     }
@@ -45,14 +45,16 @@ function move(direction: directions, board: piece[][], pieceXY: { row: number, c
         return { board, pieceXY };
     }
 
-    let b = [...board];
-    const buffer = b[translatedXY.row][translatedXY.column];
-    b[translatedXY.row][translatedXY.column] = b[pieceXY.row][pieceXY.column];
-    b[pieceXY.row][pieceXY.column] = buffer;
-    validatePosition(translatedXY.row, translatedXY.column, columnCount, b[translatedXY.row][translatedXY.column]);
-    validatePosition(pieceXY.row, pieceXY.column, columnCount, b[pieceXY.row][pieceXY.column]);
+    let newBoard = produce(board, draft => {
+        const buffer = draft[translatedXY.row][translatedXY.column];
+        draft[translatedXY.row][translatedXY.column] = draft[pieceXY.row][pieceXY.column];
+        draft[pieceXY.row][pieceXY.column] = buffer;
+        validatePosition(translatedXY.row, translatedXY.column, columnCount, draft[translatedXY.row][translatedXY.column]);
+        validatePosition(pieceXY.row, pieceXY.column, columnCount, draft[pieceXY.row][pieceXY.column]);
+        return draft;
+    })
 
-    return { board: b, pieceXY:translatedXY };
+    return {board: newBoard, pieceXY: translatedXY}
 }
 
 function validatePosition(row: number, column: number, columnCount: number, piece: piece): piece {
@@ -61,57 +63,45 @@ function validatePosition(row: number, column: number, columnCount: number, piec
     return piece;
 }
 
-const gameBoard: piece[][] = [
-    [
-        { ...pieceV, isCorrect: true, value: 1 }, { ...pieceV, isCorrect: true, value: 2 }, { ...pieceV, isCorrect: true, value: 3 }, { ...pieceV, isCorrect: true, value: 4 },
-    ],
-    [
-        { ...pieceV, isCorrect: true, value: 5 }, { ...pieceV, isCorrect: true, value: 6 }, { ...pieceV, isCorrect: true, value: 7 }, { ...pieceV, isCorrect: true, value: 8 },],
-    [
-        { ...pieceV, isCorrect: true, value: 9 }, { ...pieceV, isCorrect: true, value: 10 }, { ...pieceV, isCorrect: true, value: 11 }, { ...pieceV, isCorrect: true, value: 12 },],
-    [
-        { ...pieceV, isCorrect: true, value: 13 }, { ...pieceV, isCorrect: true, value: 14 }, { ...pieceV, isCorrect: true, value: 15 }, { ...pieceV, isCorrect: true, value: 16, isEmpty: true },],
-]
+const gameBoard: piece[][] = range(0,4).map((rowOffset) =>
+    range(1,5).map((columnOffset) : piece => ({
+        isCorrect: true,
+        value: rowOffset*4+columnOffset,
+        isEmpty: rowOffset*4+columnOffset === 16,
+    }))
+);
 
-const gameV: game = {
+const INITIAL_STATE: game = {
     board: gameBoard,
     isOver: false,
     moves: 0,
-    time: 0,
     emptyIndex: { row: gameBoard.length-1, column: gameBoard[0].length-1 }
 }
 
-const gameJSON = JSON.stringify(gameV);
-
-type piece = {
-    value: number | null,
-    isCorrect: boolean,
-    isEmpty: boolean,
-}
+const gameJSON = JSON.stringify(INITIAL_STATE);
 
 type game = {
     board: piece[][],
     isOver: boolean,
     moves: number,
-    time: number,
     emptyIndex: { row: number, column: number }
 }
 
-function Piece({ piece }: { piece: piece }) {
+function Piece({ isEmpty, ...props }: piece) {
+    if(isEmpty)
+        return (
+            <div className='piece' />
+        )
 
-    return (piece.isEmpty) ? (
-            <div className='piece' />)
-        :
-        (<div className={`piece ${piece.isCorrect ? 'correct' : 'incorrect'} helvetica`}>{piece.value}</div>
+    return(
+        <div className={`piece ${props.isCorrect ? 'correct' : 'incorrect'} helvetica`}>{props.value}</div>
         )
 }
 
 
 function Game() {
-    useEffect(() => {
-        reset();
-    },[]);
-    const [gameState, setGameState] = useState(gameV);
+    const [gameState, setGameState] = useState(INITIAL_STATE);
+    const {time, paused, setPaused} = useTimer()
 
     const reset = () => {
         const g : game = JSON.parse(gameJSON);
@@ -144,27 +134,36 @@ function Game() {
     };
 
     useEffect(() => {
-        const handleKeyPress = (event : any) => {
-            switch (event.keyCode) {
-                case 87: // W
-                case 38: // UP
+        reset();
+    },[]);
+
+    useEffect(() => {
+        const handleKeyPress = (event : KeyboardEvent) => {
+            console.log(event.key)
+            if(["w","ArrowUp","a","ArrowLeft","s","ArrowDown","d","ArrowRight"].includes(event.key))
+                event.preventDefault();
+            switch (event.key) {
+                case "Space":
+                case "p":
+                    break;
+                case "r":
+                    reset()
+                    break;
+                case "w":
+                case "ArrowUp":
                     handleMovement(directions.UP);
-                    event.preventDefault();
                     break;
-                case 65: // A
-                case 37: // LEFT
+                case "a":
+                case "ArrowLeft":
                     handleMovement(directions.LEFT);
-                    event.preventDefault();
                     break;
-                case 83: // S key
-                case 40: // DOWN
+                case "s": // S key
+                case "ArrowDown": // DOWN
                     handleMovement(directions.DOWN);
-                    event.preventDefault();
                     break;
-                case 68: // D key
-                case 39: // RIGHT
+                case "d":
+                case "ArrowRight":
                     handleMovement(directions.RIGHT);
-                    event.preventDefault();
                     break;
                 default:
                     break;
@@ -173,22 +172,7 @@ function Game() {
 
         document.addEventListener('keydown', handleKeyPress);
 
-        return () => {
-            document.removeEventListener('keydown', handleKeyPress);
-        };
-    }, []);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setGameState(prevGameState => ({
-                ...prevGameState,
-                time: prevGameState.time + 1
-            }));
-        }, 1000);
-
-        return () => {
-            clearInterval(interval);
-        };
+        return () => document.removeEventListener('keydown', handleKeyPress);
     }, []);
 
     return (
@@ -197,10 +181,6 @@ function Game() {
                 <button className="secondary-b weight six00 helvetica">
                     <div className="secondary-b-wrapper" onClick={reset}>new game</div>
                 </button>
-                {/* <!-- <div>
-            <p className="margin0">moves 0</p>
-            <p className="margin0">time 0s</p>
-        </div> --> */}
                 <div className="secondary-b white flex row width fitc gap tworem">
                     <div className="width fitc">{/* :D HEHE*/}</div>
                     <div className="flex column margin0 width five0">
@@ -209,20 +189,21 @@ function Game() {
                     </div>
                     <div className="flex column margin0 width five0">
                         <p className="margin0 text end font small helvetica">TIME</p>
-                        <p className="margin0 text end font medium weight bold helvetica">{gameState.time}s</p>
+                        <p className="margin0 text end font medium weight bold helvetica">{time}s</p>
                     </div>
                 </div>
             </div>
             <div className="game row">
                 {
                     gameState.board.map((row, index) => (
-                        <PieceRow pieces={row} key={`row-${uuidv4()}`} />
+                        // rows dont get reordered
+                        <PieceRow pieces={row} key={index} />
                     ))
                 }
             </div>
 
             <button className="secondary-b full weight six00 helvetica">
-                <div className="secondary-b-wrapper">Pause</div>
+                <div className="secondary-b-wrapper" onClick={() => setPaused(!paused)}>Pause</div>
             </button>
         </div>)
 }
@@ -230,11 +211,10 @@ function Game() {
 function PieceRow({ pieces }: { pieces: piece[] }) {
     return (
         <div className='game row flex row between'>
-            {pieces.map((val, index) => {
+            {pieces.map((pieceInfo) => {
                 return (
-                    <Piece piece={val} key={index} />
+                    <Piece {...pieceInfo} key={pieceInfo.value} />
                 )
-
             })}
         </div>);
 }

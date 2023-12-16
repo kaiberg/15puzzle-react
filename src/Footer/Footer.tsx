@@ -12,7 +12,7 @@ function Footer() {
             </div>
 
             <section>
-                <p className="primary helvetica">Made with <em className="red">❤</em> by kai</p>
+                <p className="primary helvetica">Made with <em className="red">❤️</em> by kai</p>
                 <p className="primary helvetica">This project is open source, visit the <a className="weight bold" href="google.com">repo.</a></p>
             </section>
 

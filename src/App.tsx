@@ -1,6 +1,5 @@
 import './App.css';
-import React, { useEffect, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import React from 'react';
 import {Footer} from "./Footer";
 import Header from "./Header";
 import Game from "./Game";
